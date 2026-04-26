@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>CC Custom Engraving</title>
+    <link rel="icon" type="image/png" href="./assets/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <img class="brandLogo" src="./assets/logo.png" alt="CC Custom Engraving" />
+          <div class="brandText">
+            <div class="brandName">CC Custom Engraving</div>
+            <div class="brandTag">Laser engraving • jobs • invoices</div>
+          </div>
+        </div>
+
+        <nav class="tabs" aria-label="Primary">
+          <button class="tab isActive" data-route="dashboard" type="button">Dashboard</button>
+          <button class="tab" data-route="tasks" type="button">Tasks</button>
+          <button class="tab" data-route="invoices" type="button">Invoices</button>
+          <button class="tab" data-route="settings" type="button">Settings</button>
+        </nav>
+      </header>
+
+      <main class="content" id="app" aria-live="polite"></main>
+
+      <footer class="footer">
+        <div class="muted">
+          Data is stored locally in your browser (no account needed). Use Settings → Export for backups.
+        </div>
+      </footer>
+    </div>
+
+    <dialog class="modal" id="modal">
+      <form method="dialog" class="modalCard">
+        <div class="modalHeader">
+          <div class="modalTitle" id="modalTitle">Modal</div>
+          <button class="iconBtn" value="cancel" aria-label="Close" type="submit">
+            ✕
+          </button>
+        </div>
+        <div class="modalBody" id="modalBody"></div>
+        <div class="modalFooter" id="modalFooter">
+          <button class="btn" value="cancel" type="submit">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
