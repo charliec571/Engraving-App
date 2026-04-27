@@ -62,6 +62,7 @@ function loadState() {
         nextInvoiceNumber: 2,
         paymentTerms: "Due on receipt",
         paymentInstructions: "Make checks payable to Charlie Cochran or Venmo @clc571",
+        invoiceEmailBcc: "clc571@gmail.com",
         notesDefault:
           "Please remit payment by the due date indicated above.\n\nWe appreciate your business and look forward to serving you again.",
       },
@@ -158,6 +159,57 @@ function calcInvoiceTotals(inv) {
   const tax = taxableBase * taxRate;
   const total = taxableBase + tax;
   return { subtotal, discount, tax, total };
+}
+
+function buildInvoiceEmail(inv) {
+  const totals = calcInvoiceTotals(inv);
+  const biz = state.settings || {};
+  const to = String(inv.customerEmail || "").trim();
+  const bcc = String(biz.invoiceEmailBcc || "").trim();
+  const issueMDY = formatDateMDY(inv.issueDate || "");
+  const dueMDY = formatDateMDY(inv.dueDate || "");
+
+  const subject = `${biz.businessName || "Invoice"} ${inv.number || ""}`.trim();
+  const lines = [
+    `Hi ${inv.customerName || ""},`.trim(),
+    "",
+    `Please find your invoice ${inv.number || ""} for ${money(totals.total)}.`.trim(),
+    issueMDY ? `Invoice date: ${issueMDY}` : "",
+    dueMDY ? `Due date: ${dueMDY}` : "",
+    "",
+    "Line items:",
+    ...(inv.items || []).map((it) => {
+      const qty = parseNumber(it.qty);
+      const rate = parseNumber(it.rate);
+      const amount = qty * rate;
+      return `- ${String(it.desc || "").trim() || "(no description)"} — ${qty} × ${money(rate)} = ${money(amount)}`;
+    }),
+    "",
+    `Subtotal: ${money(totals.subtotal)}`,
+    totals.discount ? `Discount: -${money(totals.discount)}` : "",
+    `Tax: ${money(totals.tax)}`,
+    `Total due: ${money(totals.total)}`,
+    "",
+    String(biz.paymentInstructions || "").trim() ? `Payment: ${String(biz.paymentInstructions || "").trim()}` : "",
+    "",
+    (biz.email || biz.phone) ? `Questions? Reply to this email or contact us at ${[biz.email, biz.phone].filter(Boolean).join(" / ")}.` : "",
+  ].filter((x) => x !== "");
+
+  const body = lines.join("\n");
+  return { to, bcc, subject, body };
+}
+
+function openEmailCompose({ to, bcc, subject, body }) {
+  const enc = encodeURIComponent;
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${enc(to)}&bcc=${enc(bcc)}&su=${enc(
+    subject,
+  )}&body=${enc(body)}`;
+
+  const w = window.open(gmailUrl, "_blank", "noopener,noreferrer");
+  if (w) return;
+
+  const mailto = `mailto:${enc(to)}?bcc=${enc(bcc)}&subject=${enc(subject)}&body=${enc(body)}`;
+  window.location.href = mailto;
 }
 
 function nextInvoiceIdAndNumber() {
@@ -1056,6 +1108,7 @@ function openInvoicePrint(inv, opts = {}) {
     footerHtml: `
       ${showBack ? `<button class="btn" id="backToEditor" value="default" type="submit">Back</button>` : ""}
       <button class="btn" id="markPaid" value="default" type="submit">Mark paid</button>
+      <button class="btn" id="emailInvoice" value="default" type="submit">Email</button>
       <button class="btn btnPrimary" id="doPrint" value="default" type="submit">Print / Save PDF</button>
     `,
     onReady: () => {
@@ -1072,6 +1125,15 @@ function openInvoicePrint(inv, opts = {}) {
         renderPrintOnly(inv);
         window.print();
         render();
+      });
+
+      document.getElementById("emailInvoice").addEventListener("click", () => {
+        const { to, bcc, subject, body } = buildInvoiceEmail(inv);
+        if (!to) {
+          alert("Customer email is blank. Add an email on the invoice, then try again.");
+          return;
+        }
+        openEmailCompose({ to, bcc, subject, body });
       });
 
       document.getElementById("markPaid").addEventListener("click", () => {
@@ -1264,6 +1326,10 @@ function renderSettings() {
                     <label for="inv_notes_default">Default notes</label>
                     <textarea id="inv_notes_default">${escapeHtml(s.notesDefault || "")}</textarea>
                   </div>
+                  <div class="field col12">
+                    <label for="inv_email_bcc">Invoice email BCC (send yourself a copy)</label>
+                    <input id="inv_email_bcc" value="${escapeHtml(s.invoiceEmailBcc || "")}" placeholder="clc571@gmail.com" />
+                  </div>
                 </div>
                 <div class="row" style="margin-top:12px; justify-content:flex-end;">
                   <button class="btn btnPrimary" id="saveInvSettings" type="button">Save</button>
@@ -1318,6 +1384,7 @@ function renderSettings() {
     state.settings.taxRate = parseNumber(document.getElementById("inv_tax_default").value);
     state.settings.paymentTerms = document.getElementById("inv_terms_default").value.trim();
     state.settings.notesDefault = document.getElementById("inv_notes_default").value.trim();
+    state.settings.invoiceEmailBcc = document.getElementById("inv_email_bcc").value.trim();
     saveState(state);
     render();
   });
