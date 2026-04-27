@@ -723,7 +723,7 @@ function openInvoiceEditor(invoice) {
                     <div id="items"></div>
                     <div class="row" style="justify-content:space-between; margin-top:10px;">
                       <button class="btn" id="addItem" type="button">+ Add item</button>
-                      <div class="badge badgeGold">Subtotal ${escapeHtml(money(totals.subtotal))}</div>
+                      <div class="badge badgeGold" id="subtotalBadge">Subtotal ${escapeHtml(money(totals.subtotal))}</div>
                     </div>
                   </div>
                 </div>
@@ -836,7 +836,7 @@ function openInvoiceEditor(invoice) {
                 </div>
                 <div class="field col2">
                   <label>Line total</label>
-                  <input value="${escapeHtml(money(parseNumber(it.qty) * parseNumber(it.rate)))}" disabled />
+                  <input data-it-total value="${escapeHtml(money(parseNumber(it.qty) * parseNumber(it.rate)))}" disabled />
                 </div>
                 <div class="col12 row" style="justify-content:flex-end; margin-top:4px;">
                   <button class="btn btnDanger" data-it-remove="${escapeHtml(it.id)}" type="button">Remove</button>
@@ -863,11 +863,12 @@ function openInvoiceEditor(invoice) {
           const desc = row.querySelector("[data-it-desc]");
           const qty = row.querySelector("[data-it-qty]");
           const rate = row.querySelector("[data-it-rate]");
+          const lineTotal = row.querySelector("[data-it-total]");
           const onChange = () => {
             it.desc = desc.value;
             it.qty = parseNumber(qty.value);
             it.rate = parseNumber(rate.value);
-            renderItems();
+            if (lineTotal) lineTotal.value = money(parseNumber(it.qty) * parseNumber(it.rate));
             recalcTotals();
           };
           desc.addEventListener("input", onChange);
@@ -884,6 +885,8 @@ function openInvoiceEditor(invoice) {
         els.subtotalLine.textContent = money(t.subtotal);
         els.taxLine.textContent = money(t.tax);
         els.discountLine.textContent = `-${money(t.discount)}`;
+        const subtotalBadge = document.getElementById("subtotalBadge");
+        if (subtotalBadge) subtotalBadge.textContent = `Subtotal ${money(t.subtotal)}`;
       }
 
       document.getElementById("addItem").addEventListener("click", () => {
