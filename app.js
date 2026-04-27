@@ -13,6 +13,17 @@ function todayISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function addDaysISO(iso, days) {
+  const [y, m, d] = String(iso || "").split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + Number(days || 0));
+  const yyyy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function formatDateMDY(iso) {
   if (!iso) return "";
   const [y, m, d] = String(iso).split("-");
@@ -710,13 +721,14 @@ function openInvoiceEditor(invoice) {
   const base = isNew
     ? (() => {
         const { id, number } = nextInvoiceIdAndNumber();
+        const issueDate = todayISO();
         return {
           id,
           number,
           title: "Laser engraving",
           status: "draft",
-          issueDate: todayISO(),
-          dueDate: "",
+          issueDate,
+          dueDate: addDaysISO(issueDate, 30),
           customerName: "",
           customerEmail: "",
           customerPhone: "",
@@ -934,6 +946,11 @@ function openInvoiceEditor(invoice) {
           desc.addEventListener("input", onChange);
           qty.addEventListener("input", onChange);
           rate.addEventListener("input", onChange);
+
+          // Make the default qty ("1") easy to replace: tapping/clicking selects it.
+          // Works for mouse, keyboard (tab), and mobile touch.
+          qty.addEventListener("focus", () => setTimeout(() => qty.select(), 0));
+          qty.addEventListener("pointerdown", () => setTimeout(() => qty.select(), 0));
         });
       }
 
@@ -950,9 +967,24 @@ function openInvoiceEditor(invoice) {
       }
 
       document.getElementById("addItem").addEventListener("click", () => {
-        base.items.push({ id: uid("item"), desc: "", qty: 1, rate: 0 });
+        const newItem = { id: uid("item"), desc: "", qty: 1, rate: 0 };
+        base.items.push(newItem);
         renderItems();
         recalcTotals();
+        const qtyEl = els.items.querySelector(`[data-item="${CSS.escape(newItem.id)}"] [data-it-qty]`);
+        if (qtyEl) qtyEl.focus();
+      });
+
+      let lastIssue = base.issueDate || "";
+      els.issue.addEventListener("input", () => {
+        const nextIssue = els.issue.value;
+        const currentDue = els.due.value;
+        const prevDefaultDue = addDaysISO(lastIssue, 30);
+        if (!currentDue || currentDue === prevDefaultDue) {
+          const nextDue = addDaysISO(nextIssue, 30);
+          if (nextDue) els.due.value = nextDue;
+        }
+        lastIssue = nextIssue;
       });
 
       document.getElementById("previewInvoice").addEventListener("click", () => {
