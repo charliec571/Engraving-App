@@ -170,6 +170,8 @@ input, textarea, select{
   border:1px solid var(--line);
   background: rgba(0,0,0,.22);
   color: var(--text);
+  caret-color: var(--text);
+  -webkit-text-fill-color: var(--text);
   border-radius: 12px;
   padding: 10px 12px;
   outline: none;
@@ -314,6 +316,10 @@ label{ display:block; color: var(--muted); font-size: 12px; margin-bottom: 6px; 
   .brand{ min-width: unset; }
   .fields .col6, .fields .col4, .fields .col3{ grid-column: span 12; }
   .fields .col2{ grid-column: span 6; }
+}
+
+@media (max-width: 420px){
+  .fields .col2{ grid-column: span 12; }
 }
 
 @media print{

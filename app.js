@@ -26,7 +26,15 @@ function money(n) {
 }
 
 function parseNumber(v) {
-  const n = Number(v);
+  const raw = String(v ?? "").trim();
+  if (!raw) return 0;
+  const cleaned = (() => {
+    // Accept values like "12.5", "12,5", "$1,234.56" across mobile/locale keyboards.
+    const s = raw.replace(/\s+/g, "").replace(/\$/g, "");
+    if (s.includes(",") && !s.includes(".")) return s.replace(/,/g, ".");
+    return s.replace(/,/g, "");
+  })();
+  const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
 }
 
