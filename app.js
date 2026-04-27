@@ -866,6 +866,7 @@ function openInvoiceEditor(invoice) {
     footerHtml: `
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn" id="saveDraft" value="default" type="submit">Save</button>
+      <button class="btn" id="saveAndEmail" value="default" type="submit">Save & Email</button>
       <button class="btn btnPrimary" id="saveAndPrint" value="default" type="submit">Save & Print</button>
     `,
     onReady: () => {
@@ -951,6 +952,10 @@ function openInvoiceEditor(invoice) {
           // Works for mouse, keyboard (tab), and mobile touch.
           qty.addEventListener("focus", () => setTimeout(() => qty.select(), 0));
           qty.addEventListener("pointerdown", () => setTimeout(() => qty.select(), 0));
+
+          // Make the default rate ("0") easy to replace as well.
+          rate.addEventListener("focus", () => setTimeout(() => rate.select(), 0));
+          rate.addEventListener("pointerdown", () => setTimeout(() => rate.select(), 0));
         });
       }
 
@@ -992,7 +997,7 @@ function openInvoiceEditor(invoice) {
         openInvoicePrint(inv, { showBack: true });
       });
 
-      function doSave({ printAfter }) {
+      function doSave({ printAfter, emailAfter }) {
         const inv = captureInvoiceFromForm(base, els);
         if (!inv.customerName) {
           alert("Customer name is required.");
@@ -1010,9 +1015,19 @@ function openInvoiceEditor(invoice) {
         closeModal();
         if (printAfter) openInvoicePrint(inv);
         else render();
+
+        if (emailAfter) {
+          const { to, bcc, subject, body } = buildInvoiceEmail(inv);
+          if (!to) {
+            alert("Saved. Customer email is blank, so the email composer could not be opened.");
+            return;
+          }
+          openEmailCompose({ to, bcc, subject, body });
+        }
       }
 
       document.getElementById("saveDraft").addEventListener("click", () => doSave({ printAfter: false }));
+      document.getElementById("saveAndEmail").addEventListener("click", () => doSave({ printAfter: false, emailAfter: true }));
       document.getElementById("saveAndPrint").addEventListener("click", () => doSave({ printAfter: true }));
 
       els.tax.addEventListener("input", recalcTotals);
