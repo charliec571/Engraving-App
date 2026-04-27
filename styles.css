@@ -313,6 +313,7 @@ label{ display:block; color: var(--muted); font-size: 12px; margin-bottom: 6px; 
   .split{ grid-template-columns: 1fr; }
   .brand{ min-width: unset; }
   .fields .col6, .fields .col4, .fields .col3{ grid-column: span 12; }
+  .fields .col2{ grid-column: span 6; }
 }
 
 @media print{
