@@ -99,10 +99,26 @@ function defaultState() {
   return loadState();
 }
 
+async function saveToCloud() {
+  if (!window.supabase) return;
+  try {
+    await supabase.from('settings').upsert({ id: 1, ...state.settings });
+    if (state.tasks.length > 0) {
+      await supabase.from('tasks').upsert(state.tasks);
+    }
+    if (state.invoices.length > 0) {
+      await supabase.from('invoices').upsert(state.invoices);
+    }
+  } catch (e) {
+    console.error("Cloud save error:", e);
+  }
+}
+
 function saveState(state) {
   state.meta = state.meta || { createdAt: Date.now(), updatedAt: Date.now() };
   state.meta.updatedAt = Date.now();
   localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(state));
+  saveToCloud();
 }
 
 let state = loadState();
@@ -395,8 +411,12 @@ function renderTasks() {
     seedTasks();
     render();
   });
-  document.getElementById("clearDone").addEventListener("click", () => {
+  document.getElementById("clearDone").addEventListener("click", async () => {
     const before = state.tasks.length;
+    const toDelete = state.tasks.filter((t) => t.status === "done").map(t => t.id);
+    if (toDelete.length > 0 && window.supabase) {
+      await supabase.from('tasks').delete().in('id', toDelete);
+    }
     state.tasks = state.tasks.filter((t) => t.status !== "done");
     if (state.tasks.length !== before) saveState(state);
     render();
@@ -412,11 +432,14 @@ function renderTasks() {
   });
 
   appEl.querySelectorAll("[data-delete-task]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const id = btn.getAttribute("data-delete-task");
       const t = state.tasks.find((x) => x.id === id);
       if (!t) return;
       if (!confirm(`Delete task "${t.title || "untitled"}"?`)) return;
+      if (window.supabase) {
+        await supabase.from('tasks').delete().eq('id', id);
+      }
       state.tasks = state.tasks.filter((x) => x.id !== id);
       saveState(state);
       render();
@@ -639,8 +662,12 @@ function renderInvoices() {
     seedInvoice();
     render();
   });
-  document.getElementById("clearVoid").addEventListener("click", () => {
+  document.getElementById("clearVoid").addEventListener("click", async () => {
     const before = state.invoices.length;
+    const toDelete = state.invoices.filter((inv) => inv.status === "void").map(inv => inv.id);
+    if (toDelete.length > 0 && window.supabase) {
+      await supabase.from('invoices').delete().in('id', toDelete);
+    }
     state.invoices = state.invoices.filter((inv) => inv.status !== "void");
     if (state.invoices.length !== before) saveState(state);
     render();
@@ -663,11 +690,14 @@ function renderInvoices() {
     });
   });
   appEl.querySelectorAll("[data-delete-invoice]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const id = btn.getAttribute("data-delete-invoice");
       const inv = state.invoices.find((x) => x.id === id);
       if (!inv) return;
       if (!confirm(`Delete invoice ${inv.number || ""}?`)) return;
+      if (window.supabase) {
+        await supabase.from('invoices').delete().eq('id', id);
+      }
       state.invoices = state.invoices.filter((x) => x.id !== id);
       saveState(state);
       render();
@@ -1439,8 +1469,14 @@ function renderSettings() {
   document.getElementById("exportData").addEventListener("click", () => exportJson());
   document.getElementById("importData").addEventListener("click", () => importJson());
 
-  document.getElementById("resetAll").addEventListener("click", () => {
+  document.getElementById("resetAll").addEventListener("click", async () => {
     if (!confirm("Reset ALL tasks and invoices? This cannot be undone.")) return;
+    if (window.supabase) {
+      const allTaskIds = state.tasks.map(t => t.id);
+      const allInvIds = state.invoices.map(inv => inv.id);
+      if (allTaskIds.length > 0) await supabase.from('tasks').delete().in('id', allTaskIds);
+      if (allInvIds.length > 0) await supabase.from('invoices').delete().in('id', allInvIds);
+    }
     localStorage.removeItem(APP_STORAGE_KEY);
     state = loadState();
     render();
@@ -1493,5 +1529,40 @@ function render() {
   else renderSettings();
 }
 
+async function initApp() {
+  if (window.supabase) {
+    try {
+      const [tasksRes, invoicesRes, settingsRes] = await Promise.all([
+        supabase.from('tasks').select('*'),
+        supabase.from('invoices').select('*'),
+        supabase.from('settings').select('*').eq('id', 1).single()
+      ]);
+      
+      let changed = false;
+      if (settingsRes.data) {
+        state.settings = { ...state.settings, ...settingsRes.data };
+        delete state.settings.id;
+        changed = true;
+      }
+      if (tasksRes.data && tasksRes.data.length) {
+        state.tasks = tasksRes.data;
+        changed = true;
+      }
+      if (invoicesRes.data && invoicesRes.data.length) {
+        state.invoices = invoicesRes.data;
+        changed = true;
+      }
+      
+      if (changed) {
+        localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(state));
+        render();
+      }
+    } catch (err) {
+      console.error("Initial cloud sync failed", err);
+    }
+  }
+}
+
+initApp();
 render();
 
