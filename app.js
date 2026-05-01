@@ -1564,9 +1564,6 @@ async function renderPublicInvoice(invoiceId) {
   }
 }
 
-async function initApp() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const invoiceId = urlParams.get('invoice');
 
 function renderGuestApp() {
   document.querySelector(".tabs").style.display = "none";
@@ -1727,6 +1724,8 @@ async function initApp() {
     const input = document.getElementById("pinInput");
     const err = document.getElementById("pinError");
     
+    setTimeout(() => input.focus(), 50);
+    
     const handleLogin = () => {
       const pin = input.value;
       if (pin === "1013") {
@@ -1752,7 +1751,6 @@ async function initApp() {
     input.addEventListener("keyup", (e) => {
        if(e.key === "Enter") handleLogin();
     });
-    input.focus();
     return;
   }
 
@@ -1766,4 +1764,3 @@ async function initApp() {
 }
 
 initApp();
-
