@@ -193,29 +193,17 @@ function buildInvoiceEmail(inv) {
   const biz = state.settings || {};
   const to = String(inv.customerEmail || "").trim();
   const bcc = String(biz.invoiceEmailBcc || "").trim();
-  const issueMDY = formatDateMDY(inv.issueDate || "");
-  const dueMDY = formatDateMDY(inv.dueDate || "");
 
   const subject = `${biz.businessName || "Invoice"} ${inv.number || ""}`.trim();
+  const linkUrl = `${window.location.origin}${window.location.pathname}?invoice=${encodeURIComponent(inv.id)}`;
+
   const lines = [
     `Hi ${inv.customerName || ""},`.trim(),
     "",
     `Please find your invoice ${inv.number || ""} for ${money(totals.total)}.`.trim(),
-    issueMDY ? `Invoice date: ${issueMDY}` : "",
-    dueMDY ? `Due date: ${dueMDY}` : "",
     "",
-    "Line items:",
-    ...(inv.items || []).map((it) => {
-      const qty = parseNumber(it.qty);
-      const rate = parseNumber(it.rate);
-      const amount = qty * rate;
-      return `- ${String(it.desc || "").trim() || "(no description)"} — ${qty} × ${money(rate)} = ${money(amount)}`;
-    }),
-    "",
-    `Subtotal: ${money(totals.subtotal)}`,
-    totals.discount ? `Discount: -${money(totals.discount)}` : "",
-    `Tax: ${money(totals.tax)}`,
-    `Total due: ${money(totals.total)}`,
+    `You can view, print, or download your official invoice at any time by clicking your secure link below:`,
+    linkUrl,
     "",
     String(biz.paymentInstructions || "").trim() ? `Payment: ${String(biz.paymentInstructions || "").trim()}` : "",
     "",
@@ -1529,7 +1517,58 @@ function render() {
   else renderSettings();
 }
 
+async function renderPublicInvoice(invoiceId) {
+  const topbar = document.querySelector(".topbar");
+  const footer = document.querySelector(".footer");
+  if (topbar) topbar.style.display = "none";
+  if (footer) footer.style.display = "none";
+
+  appEl.innerHTML = '<div style="padding: 40px; text-align: center;">Loading invoice...</div>';
+
+  if (!window.supabaseClient) {
+    appEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #ff4444;">Database connection error.</div>';
+    return;
+  }
+
+  try {
+    const [invRes, setRes] = await Promise.all([
+      window.supabaseClient.from('invoices').select('*').eq('id', invoiceId).single(),
+      window.supabaseClient.from('settings').select('*').eq('id', 1).single()
+    ]);
+
+    if (!invRes.data) throw new Error("Invoice not found.");
+    
+    if (setRes.data) {
+      state.settings = { ...state.settings, ...setRes.data };
+    }
+
+    const inv = invRes.data;
+
+    renderPrintOnly(inv);
+
+    const actionRow = document.createElement('div');
+    actionRow.className = 'row';
+    actionRow.style.justifyContent = 'center';
+    actionRow.style.marginBottom = '20px';
+    actionRow.innerHTML = `<button class="btn btnPrimary" onclick="window.print()">Print / Save as PDF</button>`;
+    
+    appEl.insertBefore(actionRow, appEl.firstChild);
+
+  } catch (err) {
+    console.error(err);
+    appEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #ff4444;">Invoice not found or could not be loaded.</div>';
+  }
+}
+
 async function initApp() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const invoiceId = urlParams.get('invoice');
+
+  if (invoiceId) {
+    await renderPublicInvoice(invoiceId);
+    return;
+  }
+
   if (window.supabaseClient) {
     try {
       const [tasksRes, invoicesRes, settingsRes] = await Promise.all([
