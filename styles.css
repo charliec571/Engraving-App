@@ -44,9 +44,9 @@ body{
 
 .brand{ display:flex; align-items:center; gap:12px; min-width: 260px; }
 .brandLogo{
-  width:44px;
-  height:44px;
-  border-radius:12px;
+  width:62px;
+  height:62px;
+  border-radius:14px;
   border:1px solid rgba(214,177,93,.45);
   box-shadow: 0 0 0 3px rgba(214,177,93,.12);
   object-fit:cover;
