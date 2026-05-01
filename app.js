@@ -216,15 +216,19 @@ function buildInvoiceEmail(inv) {
 
 function openEmailCompose({ to, bcc, subject, body }) {
   const enc = encodeURIComponent;
-  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${enc(to)}&bcc=${enc(bcc)}&su=${enc(
-    subject,
-  )}&body=${enc(body)}`;
-
-  const w = window.open(gmailUrl, "_blank", "noopener,noreferrer");
-  if (w) return;
-
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const mailto = `mailto:${enc(to)}?bcc=${enc(bcc)}&subject=${enc(subject)}&body=${enc(body)}`;
-  window.location.href = mailto;
+
+  if (isMobile) {
+    window.location.href = mailto;
+    return;
+  }
+
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=${enc(to)}&bcc=${enc(bcc)}&su=${enc(subject)}&body=${enc(body)}`;
+  const w = window.open(gmailUrl, "_blank", "noopener,noreferrer");
+  if (!w) {
+    window.location.href = mailto;
+  }
 }
 
 function nextInvoiceIdAndNumber() {
