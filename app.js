@@ -100,14 +100,14 @@ function defaultState() {
 }
 
 async function saveToCloud() {
-  if (!window.supabase) return;
+  if (!window.supabaseClient) return;
   try {
-    await supabase.from('settings').upsert({ id: 1, ...state.settings });
+    await supabaseClient.from('settings').upsert({ id: 1, ...state.settings });
     if (state.tasks.length > 0) {
-      await supabase.from('tasks').upsert(state.tasks);
+      await supabaseClient.from('tasks').upsert(state.tasks);
     }
     if (state.invoices.length > 0) {
-      await supabase.from('invoices').upsert(state.invoices);
+      await supabaseClient.from('invoices').upsert(state.invoices);
     }
   } catch (e) {
     console.error("Cloud save error:", e);
@@ -414,8 +414,8 @@ function renderTasks() {
   document.getElementById("clearDone").addEventListener("click", async () => {
     const before = state.tasks.length;
     const toDelete = state.tasks.filter((t) => t.status === "done").map(t => t.id);
-    if (toDelete.length > 0 && window.supabase) {
-      await supabase.from('tasks').delete().in('id', toDelete);
+    if (toDelete.length > 0 && window.supabaseClient) {
+      await supabaseClient.from('tasks').delete().in('id', toDelete);
     }
     state.tasks = state.tasks.filter((t) => t.status !== "done");
     if (state.tasks.length !== before) saveState(state);
@@ -437,8 +437,8 @@ function renderTasks() {
       const t = state.tasks.find((x) => x.id === id);
       if (!t) return;
       if (!confirm(`Delete task "${t.title || "untitled"}"?`)) return;
-      if (window.supabase) {
-        await supabase.from('tasks').delete().eq('id', id);
+      if (window.supabaseClient) {
+        await supabaseClient.from('tasks').delete().eq('id', id);
       }
       state.tasks = state.tasks.filter((x) => x.id !== id);
       saveState(state);
@@ -665,8 +665,8 @@ function renderInvoices() {
   document.getElementById("clearVoid").addEventListener("click", async () => {
     const before = state.invoices.length;
     const toDelete = state.invoices.filter((inv) => inv.status === "void").map(inv => inv.id);
-    if (toDelete.length > 0 && window.supabase) {
-      await supabase.from('invoices').delete().in('id', toDelete);
+    if (toDelete.length > 0 && window.supabaseClient) {
+      await supabaseClient.from('invoices').delete().in('id', toDelete);
     }
     state.invoices = state.invoices.filter((inv) => inv.status !== "void");
     if (state.invoices.length !== before) saveState(state);
@@ -695,8 +695,8 @@ function renderInvoices() {
       const inv = state.invoices.find((x) => x.id === id);
       if (!inv) return;
       if (!confirm(`Delete invoice ${inv.number || ""}?`)) return;
-      if (window.supabase) {
-        await supabase.from('invoices').delete().eq('id', id);
+      if (window.supabaseClient) {
+        await supabaseClient.from('invoices').delete().eq('id', id);
       }
       state.invoices = state.invoices.filter((x) => x.id !== id);
       saveState(state);
@@ -1471,11 +1471,11 @@ function renderSettings() {
 
   document.getElementById("resetAll").addEventListener("click", async () => {
     if (!confirm("Reset ALL tasks and invoices? This cannot be undone.")) return;
-    if (window.supabase) {
+    if (window.supabaseClient) {
       const allTaskIds = state.tasks.map(t => t.id);
       const allInvIds = state.invoices.map(inv => inv.id);
-      if (allTaskIds.length > 0) await supabase.from('tasks').delete().in('id', allTaskIds);
-      if (allInvIds.length > 0) await supabase.from('invoices').delete().in('id', allInvIds);
+      if (allTaskIds.length > 0) await supabaseClient.from('tasks').delete().in('id', allTaskIds);
+      if (allInvIds.length > 0) await supabaseClient.from('invoices').delete().in('id', allInvIds);
     }
     localStorage.removeItem(APP_STORAGE_KEY);
     state = loadState();
@@ -1530,12 +1530,12 @@ function render() {
 }
 
 async function initApp() {
-  if (window.supabase) {
+  if (window.supabaseClient) {
     try {
       const [tasksRes, invoicesRes, settingsRes] = await Promise.all([
-        supabase.from('tasks').select('*'),
-        supabase.from('invoices').select('*'),
-        supabase.from('settings').select('*').eq('id', 1).single()
+        supabaseClient.from('tasks').select('*'),
+        supabaseClient.from('invoices').select('*'),
+        supabaseClient.from('settings').select('*').eq('id', 1).single()
       ]);
       
       let changed = false;
@@ -1565,4 +1565,5 @@ async function initApp() {
 
 initApp();
 render();
+
 
