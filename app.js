@@ -1568,17 +1568,120 @@ async function initApp() {
   const urlParams = new URLSearchParams(window.location.search);
   const invoiceId = urlParams.get('invoice');
 
-  if (invoiceId) {
-    await renderPublicInvoice(invoiceId);
-    return;
-  }
+function renderGuestApp() {
+  document.querySelector(".tabs").style.display = "none";
+  appEl.innerHTML = `
+    <div class="grid" style="margin-top: 20px;">
+      <section class="card" style="grid-column: span 12; max-width: 600px; margin: 0 auto; width: 100%;">
+        <div class="cardHeader">
+          <div>
+            <div class="cardTitle">New Engraving Order</div>
+            <div class="muted">Submit your order details directly to our system.</div>
+          </div>
+          <button class="btn btnGhost" id="guestLogout" style="font-size: 12px; padding: 6px 10px;">Logout</button>
+        </div>
+        <div class="cardBody">
+          <div class="fields">
+            <div class="field col12">
+              <label for="g_customer">Customer / Organization Name</label>
+              <input id="g_customer" value="Sweetwater IT" />
+            </div>
+            <div class="field col6">
+              <label for="g_contact">Contact Name</label>
+              <input id="g_contact" value="Chelsi Prince" />
+            </div>
+            <div class="field col6">
+              <label for="g_contactInfo">Contact Info (Phone/Email)</label>
+              <input id="g_contactInfo" value="(260) 432 - 8176 ext 2180" />
+            </div>
+            <div class="field col8">
+              <label for="g_type">Type of Order</label>
+              <input id="g_type" placeholder="e.g. New Hire Tumbler Engraving" />
+            </div>
+            <div class="field col4">
+              <label for="g_qty">Quantity</label>
+              <input id="g_qty" type="number" inputmode="numeric" value="1" />
+            </div>
+            <div class="field col12">
+              <label for="g_names">Name(s) on Tumblers</label>
+              <textarea id="g_names" placeholder="List the names exactly as they should be engraved..."></textarea>
+            </div>
+            <div class="field col12">
+              <label for="g_notes">Special Notes</label>
+              <textarea id="g_notes" placeholder="Any other details or instructions..."></textarea>
+            </div>
+          </div>
+          <div class="row" style="margin-top: 20px; justify-content: flex-end;">
+             <button class="btn btnPrimary" id="submitGuestOrder">Submit Order</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
 
+  document.getElementById("guestLogout").addEventListener("click", () => {
+    sessionStorage.removeItem("authPin");
+    window.location.reload();
+  });
+
+  document.getElementById("submitGuestOrder").addEventListener("click", async () => {
+    const btn = document.getElementById("submitGuestOrder");
+    const cust = document.getElementById("g_customer").value.trim();
+    const contact = document.getElementById("g_contact").value.trim();
+    const info = document.getElementById("g_contactInfo").value.trim();
+    const type = document.getElementById("g_type").value.trim();
+    const qty = document.getElementById("g_qty").value.trim();
+    const names = document.getElementById("g_names").value.trim();
+    const notes = document.getElementById("g_notes").value.trim();
+
+    if (!type) {
+      alert("Please enter the Type of Order.");
+      return;
+    }
+
+    const compiledNotes = `Contact: ${contact} (${info})\nQuantity: ${qty}\n\nNames to engrave:\n${names}\n\nNotes:\n${notes}`;
+
+    const t = {
+      id: uid("task"),
+      title: `[New Order] ${type}`,
+      status: "todo",
+      dueDate: "",
+      customerName: cust,
+      jobName: type,
+      notes: compiledNotes,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    btn.disabled = true;
+    btn.textContent = "Submitting...";
+
+    if (window.supabaseClient) {
+      await window.supabaseClient.from('tasks').upsert(t);
+    }
+    
+    appEl.innerHTML = `
+      <div class="card" style="max-width: 500px; margin: 40px auto; text-align: center;">
+         <div class="cardBody">
+           <h2 style="color: var(--ok); font-weight: 800; letter-spacing: .2px;">Order Submitted!</h2>
+           <p class="muted" style="margin: 16px 0;">Thank you, ${escapeHtml(contact.split(' ')[0])}. Your order for <strong>${escapeHtml(type)}</strong> has been sent directly to the engraving queue.</p>
+           <button class="btn" style="margin-top: 20px;" id="submitAnother">Submit Another Order</button>
+         </div>
+      </div>
+    `;
+
+    document.getElementById("submitAnother").addEventListener("click", renderGuestApp);
+  });
+}
+
+async function loadDashboard() {
+  document.querySelector(".tabs").style.display = "flex";
   if (window.supabaseClient) {
     try {
       const [tasksRes, invoicesRes, settingsRes] = await Promise.all([
-        supabaseClient.from('tasks').select('*'),
-        supabaseClient.from('invoices').select('*'),
-        supabaseClient.from('settings').select('*').eq('id', 1).single()
+        window.supabaseClient.from('tasks').select('*'),
+        window.supabaseClient.from('invoices').select('*'),
+        window.supabaseClient.from('settings').select('*').eq('id', 1).single()
       ]);
       
       let changed = false;
@@ -1598,15 +1701,69 @@ async function initApp() {
       
       if (changed) {
         localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(state));
-        render();
       }
     } catch (err) {
       console.error("Initial cloud sync failed", err);
     }
   }
+  render();
+}
+
+async function initApp() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const invoiceId = urlParams.get('invoice');
+
+  if (invoiceId) {
+    document.getElementById("mainApp").style.display = "flex";
+    document.getElementById("mainApp").style.flexDirection = "column";
+    await renderPublicInvoice(invoiceId);
+    return;
+  }
+
+  const savedPin = sessionStorage.getItem('authPin');
+  if (!savedPin) {
+    document.getElementById("pinOverlay").style.display = "flex";
+    const submitBtn = document.getElementById("pinSubmit");
+    const input = document.getElementById("pinInput");
+    const err = document.getElementById("pinError");
+    
+    const handleLogin = () => {
+      const pin = input.value;
+      if (pin === "1013") {
+        sessionStorage.setItem('authPin', '1013');
+        document.getElementById("pinOverlay").style.display = "none";
+        document.getElementById("mainApp").style.display = "flex";
+        document.getElementById("mainApp").style.flexDirection = "column";
+        loadDashboard();
+      } else if (pin === "1979") {
+        sessionStorage.setItem('authPin', '1979');
+        document.getElementById("pinOverlay").style.display = "none";
+        document.getElementById("mainApp").style.display = "flex";
+        document.getElementById("mainApp").style.flexDirection = "column";
+        renderGuestApp();
+      } else {
+        err.style.display = "block";
+        input.value = "";
+        input.focus();
+      }
+    };
+    
+    submitBtn.addEventListener("click", handleLogin);
+    input.addEventListener("keyup", (e) => {
+       if(e.key === "Enter") handleLogin();
+    });
+    input.focus();
+    return;
+  }
+
+  document.getElementById("mainApp").style.display = "flex";
+  document.getElementById("mainApp").style.flexDirection = "column";
+  if (savedPin === "1979") {
+    renderGuestApp();
+  } else {
+    loadDashboard();
+  }
 }
 
 initApp();
-render();
-
 

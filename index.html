@@ -15,7 +15,16 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app">
+    <div id="pinOverlay" style="position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+      <div class="card" style="width: 320px; padding: 24px; text-align: center;">
+        <h2 style="margin-top: 0; font-weight: 800;">CC Custom Engraving</h2>
+        <div class="muted" style="margin-bottom: 20px;">Please enter your PIN</div>
+        <input id="pinInput" type="password" inputmode="numeric" style="text-align: center; font-size: 24px; letter-spacing: 8px; padding: 12px;" maxlength="4" />
+        <button id="pinSubmit" class="btn btnPrimary" style="width: 100%; margin-top: 16px;">Unlock</button>
+        <div id="pinError" style="color: var(--danger); margin-top: 12px; font-size: 14px; display: none;">Invalid PIN</div>
+      </div>
+    </div>
+    <div class="app" id="mainApp" style="display: none;">
       <header class="topbar">
         <div class="brand">
           <img class="brandLogo" src="./assets/logo.png" alt="CC Custom Engraving" />
