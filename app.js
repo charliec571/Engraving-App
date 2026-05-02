@@ -1711,6 +1711,7 @@ async function initApp() {
   const invoiceId = urlParams.get('invoice');
 
   if (invoiceId) {
+    document.getElementById("pinOverlay").style.display = "none";
     document.getElementById("mainApp").style.display = "flex";
     document.getElementById("mainApp").style.flexDirection = "column";
     await renderPublicInvoice(invoiceId);
