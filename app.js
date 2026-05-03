@@ -263,19 +263,19 @@ function renderDashboard() {
         </div>
         <div class="cardBody">
           <div class="grid">
-            <div class="card" style="grid-column: span 4;">
+            <div class="card col4">
               <div class="cardBody kpi">
                 <div class="kpiValue">${t.todo}</div>
                 <div class="kpiLabel">To do</div>
               </div>
             </div>
-            <div class="card" style="grid-column: span 4;">
+            <div class="card col4">
               <div class="cardBody kpi">
                 <div class="kpiValue">${t.doing}</div>
                 <div class="kpiLabel">In progress</div>
               </div>
             </div>
-            <div class="card" style="grid-column: span 4;">
+            <div class="card col4">
               <div class="cardBody kpi">
                 <div class="kpiValue">${t.done}</div>
                 <div class="kpiLabel">Done</div>
@@ -283,7 +283,7 @@ function renderDashboard() {
             </div>
           </div>
           <div class="grid" style="margin-top:14px;">
-            <div class="card" style="grid-column: span 6;">
+            <div class="card col6">
               <div class="cardHeader">
                 <div class="cardTitle">Recent tasks</div>
                 <button class="btn btnGhost" id="goTasks" type="button">Open →</button>
@@ -292,7 +292,7 @@ function renderDashboard() {
                 ${recentTasks.length ? renderMiniTasks(recentTasks) : `<div class="muted">No tasks yet.</div>`}
               </div>
             </div>
-            <div class="card" style="grid-column: span 6;">
+            <div class="card col6">
               <div class="cardHeader">
                 <div class="cardTitle">Recent invoices</div>
                 <button class="btn btnGhost" id="goInvoices" type="button">Open →</button>
@@ -1765,3 +1765,4 @@ async function initApp() {
 }
 
 initApp();
+
