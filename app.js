@@ -162,7 +162,7 @@ modal.addEventListener("close", () => {
 });
 
 function taskCounts() {
-  const counts = { todo: 0, doing: 0, done: 0 };
+  const counts = { todo: 0, doing: 0, done: 0, billed: 0 };
   for (const t of state.tasks) {
     counts[t.status] = (counts[t.status] || 0) + 1;
   }
@@ -263,22 +263,28 @@ function renderDashboard() {
         </div>
         <div class="cardBody">
           <div class="grid">
-            <div class="card col4">
+            <div class="card col3">
               <div class="cardBody kpi">
                 <div class="kpiValue">${t.todo}</div>
                 <div class="kpiLabel">To do</div>
               </div>
             </div>
-            <div class="card col4">
+            <div class="card col3">
               <div class="cardBody kpi">
                 <div class="kpiValue">${t.doing}</div>
                 <div class="kpiLabel">In progress</div>
               </div>
             </div>
-            <div class="card col4">
+            <div class="card col3">
               <div class="cardBody kpi">
                 <div class="kpiValue">${t.done}</div>
                 <div class="kpiLabel">Done</div>
+              </div>
+            </div>
+            <div class="card col3">
+              <div class="cardBody kpi">
+                <div class="kpiValue">${t.billed}</div>
+                <div class="kpiLabel">Billed</div>
               </div>
             </div>
           </div>
@@ -318,7 +324,7 @@ function renderDashboard() {
 }
 
 function statusBadge(status) {
-  if (status === "done" || status === "paid") return `<span class="badge badgeOk">${escapeHtml(status)}</span>`;
+  if (status === "done" || status === "paid" || status === "billed") return `<span class="badge badgeOk">${escapeHtml(status)}</span>`;
   if (status === "doing" || status === "sent") return `<span class="badge badgeGold">${escapeHtml(status)}</span>`;
   if (status === "void") return `<span class="badge badgeDanger">${escapeHtml(status)}</span>`;
   return `<span class="badge">${escapeHtml(status)}</span>`;
@@ -384,7 +390,7 @@ function renderTasks() {
             <div class="muted">${filtered.length} total</div>
             <div class="row">
               <button class="btn btnGhost" id="seedDemo" type="button">Add sample tasks</button>
-              <button class="btn btnDanger" id="clearDone" type="button">Clear done</button>
+              <button class="btn btnDanger" id="archiveCompleted" type="button">Archive completed</button>
             </div>
           </div>
 
@@ -403,13 +409,46 @@ function renderTasks() {
     seedTasks();
     render();
   });
-  document.getElementById("clearDone").addEventListener("click", async () => {
+  document.getElementById("archiveCompleted").addEventListener("click", async () => {
     const before = state.tasks.length;
-    const toDelete = state.tasks.filter((t) => t.status === "done").map(t => t.id);
-    if (toDelete.length > 0 && window.supabaseClient) {
+    const completedTasks = state.tasks.filter((t) => t.status === "done" || t.status === "billed");
+    const toDelete = completedTasks.map((t) => t.id);
+    
+    if (toDelete.length === 0) {
+      alert("No completed tasks to archive.");
+      return;
+    }
+
+    if (!confirm("This will archive 'done' and 'billed' tasks. Anything marked 'billed' will be downloaded as a CSV. Continue?")) return;
+
+    const billedTasks = completedTasks.filter((t) => t.status === "billed");
+    if (billedTasks.length > 0) {
+      const headers = ["ID", "Title", "Customer", "Job", "Due Date", "Notes"];
+      const rows = billedTasks.map(t => [
+        t.id, 
+        '"' + (t.title || "").replace(/"/g, '""') + '"',
+        '"' + (t.customerName || "").replace(/"/g, '""') + '"',
+        '"' + (t.jobName || "").replace(/"/g, '""') + '"',
+        t.dueDate || "",
+        '"' + (t.notes || "").replace(/"/g, '""') + '"'
+      ].join(","));
+      const csv = [headers.join(","), ...rows].join("\n");
+      
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `billed_tasks_${todayISO()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
+
+    if (window.supabaseClient) {
       await supabaseClient.from('tasks').delete().in('id', toDelete);
     }
-    state.tasks = state.tasks.filter((t) => t.status !== "done");
+    state.tasks = state.tasks.filter((t) => t.status !== "done" && t.status !== "billed");
     if (state.tasks.length !== before) saveState(state);
     render();
   });
@@ -444,6 +483,9 @@ function renderTasks() {
       const t = state.tasks.find((x) => x.id === id);
       if (!t) return;
       t.status = sel.value;
+      if (t.status === "done" && t.invoiceId) {
+        t.status = "billed";
+      }
       t.updatedAt = Date.now();
       saveState(state);
       render();
@@ -478,6 +520,7 @@ function renderTaskTable(tasks) {
                   <option value="todo" ${t.status === "todo" ? "selected" : ""}>todo</option>
                   <option value="doing" ${t.status === "doing" ? "selected" : ""}>doing</option>
                   <option value="done" ${t.status === "done" ? "selected" : ""}>done</option>
+                  <option value="billed" ${t.status === "billed" ? "selected" : ""}>billed</option>
                 </select>
               </td>
               <td>${escapeHtml(t.dueDate || "—")}</td>
@@ -507,10 +550,16 @@ function openTaskEditor(task) {
         dueDate: "",
         customerName: "",
         jobName: "",
+        invoiceId: "",
         notes: "",
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
+
+  const invoiceOptions = state.invoices
+    .filter((inv) => inv.status === "draft" || inv.status === "sent" || inv.id === t.invoiceId)
+    .map((inv) => `<option value="${escapeHtml(inv.id)}" ${t.invoiceId === inv.id ? "selected" : ""}>${escapeHtml(inv.number)} - ${escapeHtml(inv.customerName || "No Name")}</option>`)
+    .join("");
 
   openModal({
     title: isNew ? "New task" : "Edit task",
@@ -526,6 +575,7 @@ function openTaskEditor(task) {
             <option value="todo" ${t.status === "todo" ? "selected" : ""}>todo</option>
             <option value="doing" ${t.status === "doing" ? "selected" : ""}>doing</option>
             <option value="done" ${t.status === "done" ? "selected" : ""}>done</option>
+            <option value="billed" ${t.status === "billed" ? "selected" : ""}>billed</option>
           </select>
         </div>
         <div class="field col4">
@@ -536,9 +586,16 @@ function openTaskEditor(task) {
           <label for="t_customer">Customer</label>
           <input id="t_customer" value="${escapeHtml(t.customerName)}" placeholder="Customer name" />
         </div>
-        <div class="field col12">
+        <div class="field col6">
           <label for="t_job">Job / order name (optional)</label>
           <input id="t_job" value="${escapeHtml(t.jobName)}" placeholder="e.g., 10x YETI 20oz (monograms)" />
+        </div>
+        <div class="field col6">
+          <label for="t_invoice">Linked Invoice (optional)</label>
+          <select id="t_invoice">
+            <option value="">-- None --</option>
+            ${invoiceOptions}
+          </select>
         </div>
         <div class="field col12">
           <label for="t_notes">Notes</label>
@@ -558,6 +615,7 @@ function openTaskEditor(task) {
       const dueEl = document.getElementById("t_due");
       const customerEl = document.getElementById("t_customer");
       const jobEl = document.getElementById("t_job");
+      const invoiceEl = document.getElementById("t_invoice");
       const notesEl = document.getElementById("t_notes");
 
       const saveBtn = document.getElementById("saveTask");
@@ -567,7 +625,13 @@ function openTaskEditor(task) {
         t.dueDate = dueEl.value;
         t.customerName = customerEl.value.trim();
         t.jobName = jobEl.value.trim();
+        t.invoiceId = invoiceEl.value;
         t.notes = notesEl.value.trim();
+        
+        if (t.status === "done" && t.invoiceId) {
+          t.status = "billed";
+        }
+        
         t.updatedAt = Date.now();
 
         if (!t.title) {
