@@ -498,10 +498,11 @@ function renderTaskTable(tasks) {
     <table class="table">
       <thead>
         <tr>
-          <th style="width: 34%;">Task</th>
-          <th style="width: 16%;">Status</th>
-          <th style="width: 16%;">Due</th>
-          <th style="width: 20%;">Customer / Job</th>
+          <th style="width: 30%;">Task</th>
+          <th style="width: 14%;">Status</th>
+          <th style="width: 14%;">Invoice</th>
+          <th style="width: 12%;">Due</th>
+          <th style="width: 16%;">Customer / Job</th>
           <th style="width: 14%;">Actions</th>
         </tr>
       </thead>
@@ -510,6 +511,8 @@ function renderTaskTable(tasks) {
           .map((t) => {
             const title = t.title || "(untitled)";
             const job = [t.customerName, t.jobName].filter(Boolean).join(" — ") || "—";
+            const inv = state.invoices.find(i => i.id === t.invoiceId);
+            const invText = inv ? inv.number : "—";
             return `<tr>
               <td>
                 <div style="font-weight:800;">${escapeHtml(title)}</div>
@@ -523,6 +526,7 @@ function renderTaskTable(tasks) {
                   <option value="billed" ${t.status === "billed" ? "selected" : ""}>billed</option>
                 </select>
               </td>
+              <td>${escapeHtml(invText)}</td>
               <td>${escapeHtml(t.dueDate || "—")}</td>
               <td>${escapeHtml(job)}</td>
               <td>
