@@ -287,6 +287,10 @@ label {
   grid-column: span 6;
 }
 
+.col8 {
+  grid-column: span 8;
+}
+
 .col4 {
   grid-column: span 4;
 }
