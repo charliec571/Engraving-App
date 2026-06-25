@@ -378,7 +378,7 @@ function renderDashboard() {
             status: "draft",
             issueDate: todayISO(),
             items: tasks.map(t => ({
-              desc: \`\${t.title} \${t.jobName ? '(' + t.jobName + ')' : ''}\`.trim(),
+              desc: `${t.title} ${t.jobName ? '(' + t.jobName + ')' : ''}`.trim(),
               qty: 1,
               rate: 0
             })),
@@ -392,7 +392,7 @@ function renderDashboard() {
           if (!inv.items) inv.items = [];
           tasks.forEach(t => {
             inv.items.push({
-              desc: \`\${t.title} \${t.jobName ? '(' + t.jobName + ')' : ''}\`.trim(),
+              desc: `${t.title} ${t.jobName ? '(' + t.jobName + ')' : ''}`.trim(),
               qty: 1,
               rate: 0
             });
@@ -417,25 +417,25 @@ function renderDashboard() {
         return;
       }
 
-      const options = \`
+      const options = `
         <option value="NEW">-- Create New Invoice --</option>
-        \${draftInvoices.map(i => \`<option value="\${escapeHtml(i.id)}">\${escapeHtml(i.number)} - \${escapeHtml(i.customerName || "No Name")}</option>\`).join("")}
-      \`;
+        ${draftInvoices.map(i => `<option value="${escapeHtml(i.id)}">${escapeHtml(i.number)} - ${escapeHtml(i.customerName || "No Name")}</option>`).join("")}
+      `;
 
       openModal({
         title: "Add to Invoice",
-        bodyHtml: \`
+        bodyHtml: `
           <div class="fields">
             <div class="field col12">
               <label for="bulk_invoice_select">Select Invoice</label>
-              <select id="bulk_invoice_select">\${options}</select>
+              <select id="bulk_invoice_select">${options}</select>
             </div>
           </div>
-        \`,
-        footerHtml: \`
+        `,
+        footerHtml: `
           <button class="btn" value="cancel" type="submit">Cancel</button>
           <button class="btn btnPrimary" id="bulkInvoiceConfirm" type="button">Confirm</button>
-        \`,
+        `,
         onReady: () => {
           document.getElementById("bulkInvoiceConfirm").addEventListener("click", () => {
             const val = document.getElementById("bulk_invoice_select").value;
@@ -2006,7 +2006,7 @@ function attachStatusListeners() {
       const id = btn.getAttribute("data-delete-task");
       const t = state.tasks.find((x) => x.id === id);
       if (!t) return;
-      if (!confirm(\`Permanently delete task "\${t.title || "untitled"}"?\`)) return;
+      if (!confirm(`Permanently delete task "${t.title || "untitled"}"?`)) return;
       if (window.supabaseClient) {
         await supabaseClient.from('tasks').delete().eq('id', id);
       }
