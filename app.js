@@ -164,6 +164,7 @@ modal.addEventListener("close", () => {
 function taskCounts() {
   const counts = { todo: 0, doing: 0, done: 0, billed: 0 };
   for (const t of state.tasks) {
+    if (t.status === "archived" || t.status === "deleted") continue;
     counts[t.status] = (counts[t.status] || 0) + 1;
   }
   return counts;
@@ -243,7 +244,10 @@ function nextInvoiceIdAndNumber() {
 function renderDashboard() {
   const t = taskCounts();
   const i = invoiceCounts();
-  const recentTasks = [...state.tasks].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 6);
+  const recentTasks = [...state.tasks]
+    .filter((t) => t.status !== "archived" && t.status !== "deleted")
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .slice(0, 6);
   const recentInvoices = [...state.invoices]
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .slice(0, 6);
@@ -296,6 +300,13 @@ function renderDashboard() {
               </div>
               <div class="cardBody">
                 ${recentTasks.length ? renderMiniTasks(recentTasks) : `<div class="muted">No tasks yet.</div>`}
+                ${recentTasks.length ? `
+                  <div class="row" style="margin-top: 14px; justify-content: flex-end;">
+                    <button class="btn btnDanger" id="dashBtnDelete" type="button">Delete</button>
+                    <button class="btn" id="dashBtnArchive" type="button">Archive</button>
+                    <button class="btn btnPrimary" id="dashBtnInvoice" type="button">Add to Invoice</button>
+                  </div>
+                ` : ""}
               </div>
             </div>
             <div class="card col6">
@@ -321,6 +332,119 @@ function renderDashboard() {
   document.getElementById("quickNewInvoice").addEventListener("click", () => openInvoiceEditor());
   document.getElementById("goTasks").addEventListener("click", () => setRoute("tasks"));
   document.getElementById("goInvoices").addEventListener("click", () => setRoute("invoices"));
+  
+  if (recentTasks.length) {
+    const getSelected = () => {
+      return Array.from(appEl.querySelectorAll(".taskCheckbox:checked")).map(cb => cb.value);
+    };
+
+    document.getElementById("dashBtnDelete").addEventListener("click", async () => {
+      const selected = getSelected();
+      if (!selected.length) return alert("Select at least one task to delete.");
+      if (!confirm("Move selected tasks to Deleted folder?")) return;
+      for (const id of selected) {
+        const t = state.tasks.find(x => x.id === id);
+        if (t) t.status = "deleted";
+      }
+      saveState(state);
+      render();
+    });
+
+    document.getElementById("dashBtnArchive").addEventListener("click", async () => {
+      const selected = getSelected();
+      if (!selected.length) return alert("Select at least one task to archive.");
+      if (!confirm("Move selected tasks to Archive folder?")) return;
+      for (const id of selected) {
+        const t = state.tasks.find(x => x.id === id);
+        if (t) t.status = "archived";
+      }
+      saveState(state);
+      render();
+    });
+
+    document.getElementById("dashBtnInvoice").addEventListener("click", () => {
+      const selected = getSelected();
+      if (!selected.length) return alert("Select at least one task to invoice.");
+      
+      const draftInvoices = state.invoices.filter(i => i.status === "draft");
+      
+      const onAdd = (invId) => {
+        const tasks = selected.map(id => state.tasks.find(t => t.id === id)).filter(Boolean);
+        let inv;
+        if (invId === "NEW") {
+          inv = {
+            ...nextInvoiceIdAndNumber(),
+            customerName: tasks[0]?.customerName || "",
+            status: "draft",
+            issueDate: todayISO(),
+            items: tasks.map(t => ({
+              desc: \`\${t.title} \${t.jobName ? '(' + t.jobName + ')' : ''}\`.trim(),
+              qty: 1,
+              rate: 0
+            })),
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          };
+          state.invoices.unshift(inv);
+        } else {
+          inv = state.invoices.find(i => i.id === invId);
+          if (!inv) return;
+          if (!inv.items) inv.items = [];
+          tasks.forEach(t => {
+            inv.items.push({
+              desc: \`\${t.title} \${t.jobName ? '(' + t.jobName + ')' : ''}\`.trim(),
+              qty: 1,
+              rate: 0
+            });
+          });
+          inv.updatedAt = Date.now();
+        }
+        
+        // Update task linked invoice
+        for (const t of tasks) {
+          t.invoiceId = inv.id;
+          t.status = "billed";
+          t.updatedAt = Date.now();
+        }
+        
+        saveState(state);
+        closeModal();
+        openInvoiceEditor(inv);
+      };
+
+      if (draftInvoices.length === 0) {
+        onAdd("NEW");
+        return;
+      }
+
+      const options = \`
+        <option value="NEW">-- Create New Invoice --</option>
+        \${draftInvoices.map(i => \`<option value="\${escapeHtml(i.id)}">\${escapeHtml(i.number)} - \${escapeHtml(i.customerName || "No Name")}</option>\`).join("")}
+      \`;
+
+      openModal({
+        title: "Add to Invoice",
+        bodyHtml: \`
+          <div class="fields">
+            <div class="field col12">
+              <label for="bulk_invoice_select">Select Invoice</label>
+              <select id="bulk_invoice_select">\${options}</select>
+            </div>
+          </div>
+        \`,
+        footerHtml: \`
+          <button class="btn" value="cancel" type="submit">Cancel</button>
+          <button class="btn btnPrimary" id="bulkInvoiceConfirm" type="button">Confirm</button>
+        \`,
+        onReady: () => {
+          document.getElementById("bulkInvoiceConfirm").addEventListener("click", () => {
+            const val = document.getElementById("bulk_invoice_select").value;
+            onAdd(val);
+          });
+        }
+      });
+    });
+  }
 }
 
 function statusBadge(status) {
@@ -333,11 +457,12 @@ function statusBadge(status) {
 function renderMiniTasks(tasks) {
   return `
     <table class="table">
-      <thead><tr><th>Title</th><th>Status</th><th>Due</th></tr></thead>
+      <thead><tr><th style="width:30px;"></th><th>Title</th><th>Status</th><th>Due</th></tr></thead>
       <tbody>
         ${tasks
           .map(
             (t) => `<tr>
+              <td><input type="checkbox" class="taskCheckbox" value="${escapeHtml(t.id)}" /></td>
               <td>${escapeHtml(t.title || "(untitled)")}</td>
               <td>${statusBadge(t.status || "todo")}</td>
               <td>${escapeHtml(t.dueDate || "—")}</td>
@@ -371,7 +496,9 @@ function renderMiniInvoices(invoices) {
 }
 
 function renderTasks() {
-  const filtered = [...state.tasks].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const filtered = [...state.tasks]
+    .filter((t) => t.status !== "archived" && t.status !== "deleted")
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
   appEl.innerHTML = `
     <div class="grid">
@@ -524,6 +651,8 @@ function renderTaskTable(tasks) {
                   <option value="doing" ${t.status === "doing" ? "selected" : ""}>doing</option>
                   <option value="done" ${t.status === "done" ? "selected" : ""}>done</option>
                   <option value="billed" ${t.status === "billed" ? "selected" : ""}>billed</option>
+                  <option value="archived" ${t.status === "archived" ? "selected" : ""}>archived</option>
+                  <option value="deleted" ${t.status === "deleted" ? "selected" : ""}>deleted</option>
                 </select>
               </td>
               <td>${escapeHtml(invText)}</td>
@@ -1477,10 +1606,14 @@ function renderSettings() {
 
           <div class="card" style="box-shadow:none; margin-top:14px; background:rgba(255,255,255,.03);">
             <div class="cardHeader">
-              <div class="cardTitle">Backup</div>
-              <div class="muted">Export or import your data.</div>
+              <div class="cardTitle">Data Management</div>
+              <div class="muted">Manage old tasks, or export/import your data.</div>
             </div>
             <div class="cardBody">
+              <div class="row" style="margin-bottom: 20px;">
+                <button class="btn" id="goArchived" type="button">View Archived Tasks</button>
+                <button class="btn" id="goDeleted" type="button">View Deleted Tasks</button>
+              </div>
               <div class="row">
                 <button class="btn btnPrimary" id="exportData" type="button">Export JSON</button>
                 <button class="btn" id="importData" type="button">Import JSON</button>
@@ -1541,6 +1674,9 @@ function renderSettings() {
     state = loadState();
     render();
   });
+
+  document.getElementById("goArchived").addEventListener("click", () => setRoute("archivedTasks"));
+  document.getElementById("goDeleted").addEventListener("click", () => setRoute("deletedTasks"));
 }
 
 function exportJson() {
@@ -1585,6 +1721,8 @@ function importJson() {
 function render() {
   if (route === "dashboard") renderDashboard();
   else if (route === "tasks") renderTasks();
+  else if (route === "archivedTasks") renderArchivedTasks();
+  else if (route === "deletedTasks") renderDeletedTasks();
   else if (route === "invoices") renderInvoices();
   else renderSettings();
 }
@@ -1774,7 +1912,127 @@ async function loadDashboard() {
   render();
 }
 
-async function initApp() {
+async function renderArchivedTasks() {
+  const filtered = [...state.tasks].filter(t => t.status === "archived").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  appEl.innerHTML = `
+    <div class="grid">
+      <section class="card" style="grid-column: span 12;">
+        <div class="cardHeader">
+          <div>
+            <div class="cardTitle">Archived Tasks</div>
+            <div class="muted">Tasks you have archived.</div>
+          </div>
+          <div class="row">
+            <button class="btn btnGhost" id="goSettingsFromArchive" type="button">← Back to Settings</button>
+          </div>
+        </div>
+        <div class="cardBody">
+          <div class="muted" style="margin-bottom: 12px;">${filtered.length} total</div>
+          <div class="card" style="box-shadow:none; background:rgba(255,255,255,.03);">
+            <div class="cardBody">
+              ${filtered.length ? renderTaskTable(filtered) : `<div class="muted">No archived tasks.</div>`}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+  document.getElementById("goSettingsFromArchive").addEventListener("click", () => setRoute("settings"));
+  attachStatusListeners();
+}
+
+function renderDeletedTasks() {
+  const filtered = [...state.tasks].filter(t => t.status === "deleted").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  appEl.innerHTML = `
+    <div class="grid">
+      <section class="card" style="grid-column: span 12;">
+        <div class="cardHeader">
+          <div>
+            <div class="cardTitle">Deleted Tasks</div>
+            <div class="muted">Tasks you have deleted.</div>
+          </div>
+          <div class="row">
+            <button class="btn btnGhost" id="goSettingsFromDeleted" type="button">← Back to Settings</button>
+          </div>
+        </div>
+        <div class="cardBody">
+          <div class="row" style="justify-content:space-between; margin-bottom: 12px;">
+            <div class="muted">${filtered.length} total</div>
+            <div class="row">
+              <button class="btn btnDanger" id="emptyTrash" type="button">Empty Trash</button>
+            </div>
+          </div>
+          <div class="card" style="box-shadow:none; background:rgba(255,255,255,.03);">
+            <div class="cardBody">
+              ${filtered.length ? renderTaskTable(filtered) : `<div class="muted">No deleted tasks.</div>`}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+  document.getElementById("goSettingsFromDeleted").addEventListener("click", () => setRoute("settings"));
+  
+  const emptyBtn = document.getElementById("emptyTrash");
+  if (emptyBtn) {
+    emptyBtn.addEventListener("click", async () => {
+      if (!confirm("Permanently delete all tasks in the trash? This cannot be undone.")) return;
+      const toDelete = state.tasks.filter(t => t.status === "deleted").map(t => t.id);
+      if (!toDelete.length) return;
+      if (window.supabaseClient) {
+        await supabaseClient.from('tasks').delete().in('id', toDelete);
+      }
+      state.tasks = state.tasks.filter(t => t.status !== "deleted");
+      saveState(state);
+      render();
+    });
+  }
+  
+  attachStatusListeners();
+}
+
+function attachStatusListeners() {
+  appEl.querySelectorAll("[data-edit-task]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-edit-task");
+      const t = state.tasks.find((x) => x.id === id);
+      if (!t) return;
+      openTaskEditor(t);
+    });
+  });
+
+  appEl.querySelectorAll("[data-delete-task]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-delete-task");
+      const t = state.tasks.find((x) => x.id === id);
+      if (!t) return;
+      if (!confirm(\`Permanently delete task "\${t.title || "untitled"}"?\`)) return;
+      if (window.supabaseClient) {
+        await supabaseClient.from('tasks').delete().eq('id', id);
+      }
+      state.tasks = state.tasks.filter((x) => x.id !== id);
+      saveState(state);
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("select[data-task-status]").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const id = sel.getAttribute("data-task-status");
+      const t = state.tasks.find((x) => x.id === id);
+      if (!t) return;
+      t.status = sel.value;
+      if (t.status === "done" && t.invoiceId) {
+        t.status = "billed";
+      }
+      t.updatedAt = Date.now();
+      saveState(state);
+      render();
+    });
+  });
+}
+
+function initApp() {
   const urlParams = new URLSearchParams(window.location.search);
   const invoiceId = urlParams.get('invoice');
 
