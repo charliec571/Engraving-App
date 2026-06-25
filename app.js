@@ -2032,7 +2032,7 @@ function attachStatusListeners() {
   });
 }
 
-function initApp() {
+async function initApp() {
   const urlParams = new URLSearchParams(window.location.search);
   const invoiceId = urlParams.get('invoice');
 
