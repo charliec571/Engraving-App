@@ -114,6 +114,26 @@ async function saveToCloud() {
   }
 }
 
+/**
+ * Fires a lightweight Supabase query at most once every 2 days to prevent
+ * the free-tier project from being auto-paused due to inactivity.
+ * Only runs when the app is open in a browser.
+ */
+async function keepaliveSupabase() {
+  if (!window.supabaseClient) return;
+  const KEEPALIVE_KEY = "supabaseKeepaliveAt";
+  const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+  const lastPing = parseInt(localStorage.getItem(KEEPALIVE_KEY) || "0", 10);
+  if (Date.now() - lastPing < TWO_DAYS_MS) return; // too soon, skip
+  try {
+    await window.supabaseClient.from('settings').select('id').eq('id', 1).single();
+    localStorage.setItem(KEEPALIVE_KEY, String(Date.now()));
+    console.log("Supabase keepalive ping sent.");
+  } catch (e) {
+    console.warn("Supabase keepalive ping failed:", e);
+  }
+}
+
 function saveState(state) {
   state.meta = state.meta || { createdAt: Date.now(), updatedAt: Date.now() };
   state.meta.updatedAt = Date.now();
@@ -1909,6 +1929,7 @@ async function loadDashboard() {
       console.error("Initial cloud sync failed", err);
     }
   }
+  keepaliveSupabase(); // fire-and-forget keepalive ping (max once per 2 days)
   render();
 }
 
