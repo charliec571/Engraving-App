@@ -398,6 +398,7 @@ function renderDashboard() {
             status: "draft",
             issueDate: todayISO(),
             items: tasks.map(t => ({
+              id: uid("item"),
               desc: `${t.title} ${t.jobName ? '(' + t.jobName + ')' : ''}`.trim(),
               qty: 1,
               rate: 0
@@ -412,6 +413,7 @@ function renderDashboard() {
           if (!inv.items) inv.items = [];
           tasks.forEach(t => {
             inv.items.push({
+              id: uid("item"),
               desc: `${t.title} ${t.jobName ? '(' + t.jobName + ')' : ''}`.trim(),
               qty: 1,
               rate: 0
@@ -1130,6 +1132,8 @@ function openInvoiceEditor(invoice) {
       };
 
       function renderItems() {
+        // Guard: ensure every item has an id (items created before this fix may not)
+        base.items.forEach(it => { if (!it.id) it.id = uid("item"); });
         els.items.innerHTML = base.items
           .map(
             (it, idx) => `
