@@ -1184,8 +1184,11 @@ function openInvoiceEditor(invoice) {
             recalcTotals();
           };
           desc.addEventListener("input", onChange);
+          desc.addEventListener("change", onChange);
           qty.addEventListener("input", onChange);
+          qty.addEventListener("change", onChange);
           rate.addEventListener("input", onChange);
+          rate.addEventListener("change", onChange);
 
           // Make the default qty ("1") easy to replace: tapping/clicking selects it.
           // Works for mouse, keyboard (tab), and mobile touch.
